@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gerador TEMPLATE Aplicação e Resgate GPR</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #eef2f7, #dfe7f3);
+      min-height: 100vh;
+      color: #1f2937;
+      padding: 10px;
+    }
+
+    .container {
+      width: 96%;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    .hero {
+      background: #203452;
+      color: white;
+      padding: 34px 38px;
+      border-radius: 14px;
+      box-shadow: 0 18px 40px rgba(32, 52, 82, 0.24);
+      margin-bottom: 24px;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      text-align: center;
+    }
+
+    .hero::after {
+      display: none;
+    }
+
+    .hero h1 {
+      font-size: 2rem;
+      margin-bottom: 12px;
+      font-weight: 800;
+      letter-spacing: -0.4px;
+      position: relative;
+      z-index: 1;
+      text-align: center;
+    }
+
+    .hero p {
+      font-size: 1rem;
+      opacity: 0.96;
+      line-height: 1.6;
+      max-width: 1150px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+      text-align: center;
+    }
+
+    .hero strong {
+      color: #ffffff;
+      font-weight: 800;
+    }
+
+    .grid-top {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      margin: 20px 0 24px 0;
+    }
+
+    .info-box {
+      background: white;
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06);
+      border: 1px solid #e5e7eb;
+    }
+
+    .info-box strong {
+      display: block;
+      color: #0f2d57;
+      margin-bottom: 6px;
+      font-size: 0.95rem;
+    }
+
+    .info-box span {
+      font-size: 0.92rem;
+      color: #4b5563;
+      line-height: 1.4;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: 22px;
+      padding: 28px;
+      box-shadow: 0 18px 35px rgba(0, 0, 0, 0.08);
+      border: 1px solid #e6eaf0;
+    }
+
+    .section-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #0f2d57;
+      margin-bottom: 10px;
+    }
+
+    .section-subtitle {
+      color: #4b5563;
+      margin-bottom: 22px;
+      line-height: 1.5;
+    }
+
+    .flash-area {
+      margin-bottom: 20px;
+    }
+
+    .flash {
+      padding: 14px 18px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+
+    .flash.erro {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+
+    .group {
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 18px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .group.required {
+      border-left: 6px solid #1d4ed8;
+      background: #f8fbff;
+    }
+
+    .group.future {
+      border-left: 6px solid #7c3aed;
+      background: #faf7ff;
+    }
+
+    .group-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .group h3 {
+      font-size: 1.08rem;
+      color: #111827;
+    }
+
+    .badge {
+      font-size: 0.78rem;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+
+    .badge.required {
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+
+    .badge.optional {
+      background: #ede9fe;
+      color: #6d28d9;
+    }
+
+    .group p {
+      color: #6b7280;
+      font-size: 0.93rem;
+      margin-bottom: 18px;
+      line-height: 1.45;
+    }
+
+    .upload-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    .upload-grid.three-columns {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    @media (max-width: 1100px) {
+      .upload-grid.three-columns {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .file-box {
+      background: white;
+      border: 1px dashed #cbd5e1;
+      border-radius: 14px;
+      padding: 16px;
+      transition: 0.2s ease;
+    }
+
+    .file-box:hover {
+      border-color: #203d72;
+      box-shadow: 0 8px 20px rgba(32, 61, 114, 0.08);
+    }
+
+    .file-box label {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: #111827;
+    }
+
+    .file-input-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .file-input-row input[type="file"] {
+      display: none;
+    }
+
+    .custom-file-btn {
+      background: white;
+      color: #203d72;
+      padding: 11px 18px;
+      border-radius: 10px;
+      font-size: 0.92rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: 1px solid #203d72;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 6px 14px rgba(32, 61, 114, 0.08);
+    }
+
+    .custom-file-btn::before {
+      font-size: 0.95rem;
+    }
+
+    .custom-file-btn:hover {
+      background: #203d72;
+      color: white;
+      transform: translateY(-1px);
+      box-shadow: 0 10px 22px rgba(32, 61, 114, 0.18);
+    }
+
+    
+
+    .submit-area {
+      margin-top: 28px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(220px, 1fr));
+      gap: 18px;
+      align-items: center;
+    }
+
+    .submit-btn,
+    .secondary-btn {
+      width: 100%;
+      min-height: 56px;
+      border-radius: 10px;
+      padding: 15px 28px;
+      font-size: 1rem;
+      font-weight: 800;
+      cursor: pointer;
+      letter-spacing: 0.2px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: all 0.2s ease;
+    }
+
+    .submit-btn {
+      background: linear-gradient(135deg, #203452, #315f9d);
+      color: white;
+      border: none;
+      box-shadow: 0 14px 28px rgba(32, 52, 82, 0.26);
+    }
+
+    .submit-btn::before {
+      content: "⚙️";
+      font-size: 1rem;
+    }
+
+    .submit-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 18px 34px rgba(32, 52, 82, 0.32);
+      filter: brightness(1.05);
+    }
+
+    .secondary-btn {
+      background: white;
+      color: #203452;
+      border: 1px solid #203452;
+      box-shadow: 0 10px 22px rgba(32, 52, 82, 0.10);
+    }
+
+    .secondary-btn::before {
+      content: "📄";
+      font-size: 1rem;
+    }
+
+    .secondary-btn:hover:not(:disabled) {
+      background: #eef4ff;
+      transform: translateY(-2px);
+      box-shadow: 0 14px 28px rgba(32, 52, 82, 0.18);
+    }
+
+    .secondary-btn:disabled {
+      background: #f3f4f6;
+      color: #9ca3af;
+      border-color: #d1d5db;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    @media (max-width: 768px) {
+      .submit-area {
+        grid-template-columns: 1fr;
+      }
+    }
+
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="hero">
+      <h1>GERADOR TEMPLATE APLICAÇÕES E RESGATE GPR</h1>
+      <p>
+        Envie os arquivos CSV para gerar automaticamente o XLSX do template.
+        O arquivo <strong>016132</strong> é obrigatório. Para gerar a aba de
+        <strong>data futura</strong>, envie também os arquivos
+        <strong>016199</strong>, <strong>016174</strong> e <strong>016170</strong>.
+      </p>
+    </div>
+
+    <div class="grid-top">
+      <div class="info-box">
+        <strong>Obrigatório</strong>
+        <span>O arquivo 016132 sempre deve ser enviado para gerar a aba do dia atual.</span>
+      </div>
+      <div class="info-box">
+        <strong>Data futura</strong>
+        <span>Se quiser gerar data futura, os três arquivos complementares devem ser enviados juntos.</span>
+      </div>
+      <div class="info-box">
+        <strong>Saída</strong>
+        <span>O sistema gera um arquivo XLSX pronto para download ao final do processamento.</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Upload dos arquivos</div>
+      <div class="section-subtitle">
+        Selecione os arquivos necessários abaixo e clique em <strong>Gerar XLSX</strong>.
+      </div>
+
+      <div class="flash-area">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+      </div>
+
+      <form action="/gerar" method="POST" enctype="multipart/form-data">
+        
+        <div class="group required">
+          <div class="group-header">
+            <h3>Arquivo principal</h3>
+            <span class="badge required">Obrigatório</span>
+          </div>
+          <p>Envie o CSV 016132 para gerar a aba referente ao dia atual.</p>
+
+          <div class="upload-grid">
+            <div class="file-box">
+              <label for="arquivo_132">016132 - Lançamentos Aplicação / Resgate BI</label>
+              <div class="file-input-row">
+                <label class="custom-file-btn" for="arquivo_132">Escolher arquivo</label>
+                <input id="arquivo_132" name="arquivo_132" type="file" accept=".csv" required>
+                <span class="file-name" id="file-name-132">Nenhum arquivo selecionado</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="group future">
+          <div class="group-header">
+            <h3>Arquivos de data futura</h3>
+            <span class="badge optional">Opcional</span>
+          </div>
+          <p>
+            Se não houver data futura, deixe os três campos abaixo em branco.
+            Caso envie um deles, será necessário enviar os três.
+          </p>
+
+          <div class="upload-grid three-columns">
+            <div class="file-box">
+              <label for="arquivo_199">016199 - Lançamentos Aplicação / Resgate BI OBO</label>
+              <div class="file-input-row">
+                <label class="custom-file-btn" for="arquivo_199">Escolher arquivo</label>
+                <input id="arquivo_199" name="arquivo_199" type="file" accept=".csv">
+                <span class="file-name" id="file-name-199">Nenhum arquivo selecionado</span>
+              </div>
+            </div>
+
+            <div class="file-box">
+              <label for="arquivo_174">016174 - OBO Paga BI</label>
+              <div class="file-input-row">
+                <label class="custom-file-btn" for="arquivo_174">Escolher arquivo</label>
+                <input id="arquivo_174" name="arquivo_174" type="file" accept=".csv">
+                <span class="file-name" id="file-name-174">Nenhum arquivo selecionado</span>
+              </div>
+            </div>
+
+            <div class="file-box">
+              <label for="arquivo_170">016170 - PD Paga BI</label>
+              <div class="file-input-row">
+                <label class="custom-file-btn" for="arquivo_170">Escolher arquivo</label>
+                <input id="arquivo_170" name="arquivo_170" type="file" accept=".csv">
+                <span class="file-name" id="file-name-170">Nenhum arquivo selecionado</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tips">
+          <h4>Orientações importantes</h4>
+          <ul>
+            <li>O arquivo 016132 é obrigatório.</li>
+            <li>Para data futura, envie juntos os arquivos 016199, 016174 e 016170.</li>
+            <li>Envie apenas arquivos no formato CSV.</li>
+            <li>Após o processamento, o XLSX será baixado automaticamente.</li>
+          </ul>
+        </div>
+
+        
+        <div class="submit-area">
+          <button type="submit" formaction="/gerar" class="submit-btn">
+            Gerar XLSX
+          </button>
+
+          <button type="button" class="secondary-btn" onclick="abrirSeletorXLSX()">
+            Converter XLS
+          </button>
+        </div>
+
+        <div class="footer-note">
+          Sistema local para geração do template GPR.
+        </div>
+      </form>
+      <form id="form-converter-xls" action="/converter-xls" method="POST" enctype="multipart/form-data" style="display: none;">
+        <input id="arquivo_xlsx" name="arquivo_xlsx" type="file" accept=".xlsx">
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function bindFileName(inputId, labelId) {
+      const input = document.getElementById(inputId);
+      const label = document.getElementById(labelId);
+
+      if (!input || !label) return;
+
+      input.addEventListener("change", function () {
+        if (this.files && this.files.length > 0) {
+          label.textContent = this.files[0].name;
+        } else {
+          label.textContent = "Nenhum arquivo selecionado";
+        }
+      });
+    }
+
+    function abrirSeletorXLSX() {
+      const inputXLSX = document.getElementById("arquivo_xlsx");
+      inputXLSX.value = "";
+      inputXLSX.click();
+    }
+
+    const inputXLSX = document.getElementById("arquivo_xlsx");
+
+    if (inputXLSX) {
+      inputXLSX.addEventListener("change", function () {
+        if (this.files && this.files.length > 0) {
+          document.getElementById("form-converter-xls").submit();
+        }
+      });
+    }
+
+    bindFileName("arquivo_132", "file-name-132");
+    bindFileName("arquivo_199", "file-name-199");
+    bindFileName("arquivo_174", "file-name-174");
+    bindFileName("arquivo_170", "file-name-170");
+  </script>
+</body>
+</html>
