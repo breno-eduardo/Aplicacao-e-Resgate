@@ -9,7 +9,12 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-from flask import Flask, request, render_template, send_file, redirect, url_for, flash
+from flask import Flask, request, render_template, send_file, redirect, url_for, flash, session
+
+from functools import wraps
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from werkzeug.security import generate_password_hash, check_password_hash
 
 import subprocess
 import shutil
@@ -1018,6 +1023,97 @@ def gerar_xlsx(caminho_132, caminho_199, caminho_174, caminho_170, caminho_saida
 # ============================================================
 
 app = Flask(__name__)
+
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+
+def conectar_banco():
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL não configurada.")
+
+    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+
+
+def inicializar_banco():
+    conn = conectar_banco()
+
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS usuarios (
+                        id SERIAL PRIMARY KEY,
+                        nome TEXT NOT NULL,
+                        email TEXT UNIQUE NOT NULL,
+                        senha_hash TEXT NOT NULL,
+                        ativo BOOLEAN NOT NULL DEFAULT TRUE,
+                        admin BOOLEAN NOT NULL DEFAULT FALSE,
+                        criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+                    );
+                """)
+
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS logs_acesso (
+                        id SERIAL PRIMARY KEY,
+                        usuario_id INTEGER REFERENCES usuarios(id),
+                        acao TEXT NOT NULL,
+                        ip TEXT,
+                        user_agent TEXT,
+                        criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+                    );
+                """)
+
+                admin_nome = os.environ.get("ADMIN_NOME", "Administrador")
+                admin_email = os.environ.get("ADMIN_EMAIL")
+                admin_senha = os.environ.get("ADMIN_PASSWORD")
+
+                if admin_email and admin_senha:
+                    cur.execute(
+                        "SELECT id FROM usuarios WHERE email = %s",
+                        (admin_email,)
+                    )
+                    usuario_existente = cur.fetchone()
+
+                    if not usuario_existente:
+                        cur.execute("""
+                            INSERT INTO usuarios (nome, email, senha_hash, admin)
+                            VALUES (%s, %s, %s, TRUE)
+                        """, (
+                            admin_nome,
+                            admin_email,
+                            generate_password_hash(admin_senha)
+                        ))
+
+    finally:
+        conn.close()
+
+
+def registrar_log(acao):
+    usuario_id = session.get("usuario_id")
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+    user_agent = request.headers.get("User-Agent", "")
+
+    try:
+        conn = conectar_banco()
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO logs_acesso (usuario_id, acao, ip, user_agent)
+                    VALUES (%s, %s, %s, %s)
+                """, (usuario_id, acao, ip, user_agent))
+        conn.close()
+    except Exception:
+        pass
+
+
+def login_obrigatorio(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not session.get("usuario_id"):
+            return redirect(url_for("login"))
+        return func(*args, **kwargs)
+    return wrapper
+
 app.secret_key = os.environ.get("SECRET_KEY", "troque-esta-chave-em-producao")
 
 ALLOWED_EXTENSIONS = {"csv"}
@@ -1108,6 +1204,58 @@ def converter_xlsx_para_xls_web(caminho_xlsx, pasta_saida):
 
     return caminho_xls
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        senha = request.form.get("senha", "")
+
+        conn = conectar_banco()
+
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT id, nome, email, senha_hash, ativo
+                        FROM usuarios
+                        WHERE email = %s
+                    """, (email,))
+
+                    usuario = cur.fetchone()
+
+            if not usuario:
+                flash("E-mail ou senha inválidos.", "erro")
+                return redirect(url_for("login"))
+
+            if not usuario["ativo"]:
+                flash("Usuário inativo.", "erro")
+                return redirect(url_for("login"))
+
+            if not check_password_hash(usuario["senha_hash"], senha):
+                flash("E-mail ou senha inválidos.", "erro")
+                return redirect(url_for("login"))
+
+            session["usuario_id"] = usuario["id"]
+            session["usuario_nome"] = usuario["nome"]
+            session["usuario_email"] = usuario["email"]
+
+            registrar_log("login")
+
+            return redirect(url_for("index"))
+
+        finally:
+            conn.close()
+
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    registrar_log("logout")
+    session.clear()
+    return redirect(url_for("login"))
+
+
 @app.route("/", methods=["GET"])
 def index():
     return render_template("index.html")
@@ -1151,6 +1299,8 @@ def gerar_web():
 
             arquivo_memoria.seek(0)
 
+            registrar_log("gerou_xlsx")
+
             return send_file(
                 arquivo_memoria,
                 as_attachment=True,
@@ -1161,8 +1311,8 @@ def gerar_web():
     except Exception as e:
         flash(str(e), "erro")
         return redirect(url_for("index"))
-    
 @app.route("/converter-xls", methods=["POST"])
+@login_obrigatorio
 def converter_xls_web():
     try:
         with tempfile.TemporaryDirectory() as pasta_temp:
@@ -1185,6 +1335,8 @@ def converter_xls_web():
 
             arquivo_memoria.seek(0)
 
+            registrar_log("converteu_xls")
+
             return send_file(
                 arquivo_memoria,
                 as_attachment=True,
@@ -1195,6 +1347,17 @@ def converter_xls_web():
     except Exception as e:
         flash(str(e), "erro")
         return redirect(url_for("index"))
+
+
+with app.app_context():
+    if DATABASE_URL:
+        try:
+            inicializar_banco()
+            print("Banco inicializado com sucesso.")
+        except Exception as e:
+            print(f"Erro ao inicializar banco: {e}")
+    else:
+        print("DATABASE_URL não configurada. Banco não inicializado neste ambiente.")
 
 
 if __name__ == "__main__":
