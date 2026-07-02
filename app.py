@@ -1248,20 +1248,15 @@ def login():
 
     return render_template("login.html")
 
-
-@app.route("/logout")
-def logout():
-    registrar_log("logout")
-    session.clear()
-    return redirect(url_for("login"))
-
-
 @app.route("/", methods=["GET"])
+@login_obrigatorio
 def index():
+    registrar_log("acessou_pagina_inicial")
     return render_template("index.html")
 
 
 @app.route("/gerar", methods=["POST"])
+@login_obrigatorio
 def gerar_web():
     try:
         with tempfile.TemporaryDirectory() as pasta_temp:
@@ -1311,7 +1306,7 @@ def gerar_web():
     except Exception as e:
         flash(str(e), "erro")
         return redirect(url_for("index"))
-@app.route("/converter-xls", methods=["POST"])
+ @app.route("/converter-xls", methods=["POST"])
 @login_obrigatorio
 def converter_xls_web():
     try:
