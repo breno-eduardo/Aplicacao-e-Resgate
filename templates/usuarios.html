@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Usuários - Aplicação e Resgate GPR</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #eef2f7;
+      color: #1f2937;
+      padding: 30px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 14px 28px rgba(0,0,0,0.08);
+      margin-bottom: 24px;
+    }
+
+    h1, h2 {
+      color: #203452;
+      margin-top: 0;
+    }
+
+    label {
+      font-weight: 700;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #cbd5e1;
+      margin-bottom: 16px;
+    }
+
+    button {
+      background: #203452;
+      color: white;
+      border: none;
+      padding: 13px 22px;
+      border-radius: 10px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: left;
+    }
+
+    th {
+      background: #f8fafc;
+      color: #203452;
+    }
+
+    .top-links {
+      margin-bottom: 18px;
+    }
+
+    .top-links a {
+      color: #203452;
+      font-weight: 700;
+      text-decoration: none;
+      margin-right: 16px;
+    }
+
+    .flash {
+      padding: 12px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      font-weight: 600;
+    }
+
+    .flash.erro {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+
+    .flash.sucesso {
+      background: #dcfce7;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .checkbox-row input {
+      width: auto;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="top-links">
+      <a href="/">Voltar ao sistema</a>
+      <a href="/logout">Sair</a>
+    </div>
+
+    <div class="card">
+      <h1>Usuários</h1>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <h2>Criar novo usuário</h2>
+
+      <form method="POST" action="/admin/usuarios">
+        <label for="nome">Nome</label>
+        <input id="nome" name="nome" type="text" required>
+
+        <label for="email">E-mail</label>
+        <input id="email" name="email" type="email" required>
+
+        <label for="senha">Senha</label>
+        <input id="senha" name="senha" type="password" required>
+
+        <div class="checkbox-row">
+          <input id="admin" name="admin" type="checkbox">
+          <label for="admin">Usuário administrador</label>
+        </div>
+
+        <button type="submit">Criar usuário</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Usuários cadastrados</h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>E-mail</th>
+            <th>Admin</th>
+            <th>Ativo</th>
+            <th>Criado em</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for usuario in usuarios %}
+            <tr>
+              <td>{{ usuario.nome }}</td>
+              <td>{{ usuario.email }}</td>
+              <td>{{ "Sim" if usuario.admin else "Não" }}</td>
+              <td>{{ "Sim" if usuario.ativo else "Não" }}</td>
+              <td>{{ usuario.criado_em }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</body>
+</html>

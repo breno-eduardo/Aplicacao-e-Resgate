@@ -1114,6 +1114,19 @@ def login_obrigatorio(func):
         return func(*args, **kwargs)
     return wrapper
 
+def admin_obrigatorio(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not session.get("usuario_id"):
+            return redirect(url_for("login"))
+
+        if not session.get("usuario_admin"):
+            flash("Acesso restrito ao administrador.", "erro")
+            return redirect(url_for("index"))
+
+        return func(*args, **kwargs)
+    return wrapper
+
 app.secret_key = os.environ.get("SECRET_KEY", "troque-esta-chave-em-producao")
 
 ALLOWED_EXTENSIONS = {"csv"}
@@ -1216,7 +1229,7 @@ def login():
             with conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        SELECT id, nome, email, senha_hash, ativo
+                        SELECT id, nome, email, senha_hash, ativo, admin
                         FROM usuarios
                         WHERE email = %s
                     """, (email,))
@@ -1238,6 +1251,7 @@ def login():
             session["usuario_id"] = usuario["id"]
             session["usuario_nome"] = usuario["nome"]
             session["usuario_email"] = usuario["email"]
+            session["usuario_admin"] = usuario["admin"]
 
             registrar_log("login")
 
@@ -1247,6 +1261,70 @@ def login():
             conn.close()
 
     return render_template("login.html")
+
+@app.route("/admin/usuarios", methods=["GET", "POST"])
+@login_obrigatorio
+@admin_obrigatorio
+def admin_usuarios():
+    if request.method == "POST":
+        nome = request.form.get("nome", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        senha = request.form.get("senha", "")
+        admin = True if request.form.get("admin") == "on" else False
+
+        if not nome or not email or not senha:
+            flash("Preencha nome, e-mail e senha.", "erro")
+            return redirect(url_for("admin_usuarios"))
+
+        senha_hash = generate_password_hash(senha)
+
+        try:
+            conn = conectar_banco()
+
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO usuarios (nome, email, senha_hash, admin, ativo)
+                        VALUES (%s, %s, %s, %s, TRUE)
+                    """, (nome, email, senha_hash, admin))
+
+            conn.close()
+
+            registrar_log(f"criou_usuario:{email}")
+            flash("Usuário criado com sucesso.", "sucesso")
+
+        except Exception as e:
+            flash(f"Erro ao criar usuário: {e}", "erro")
+
+        return redirect(url_for("admin_usuarios"))
+
+    usuarios = []
+
+    try:
+        conn = conectar_banco()
+
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, nome, email, ativo, admin, criado_em
+                    FROM usuarios
+                    ORDER BY criado_em DESC
+                """)
+                usuarios = cur.fetchall()
+
+        conn.close()
+
+    except Exception as e:
+        flash(f"Erro ao listar usuários: {e}", "erro")
+
+    return render_template("usuarios.html", usuarios=usuarios)
+
+@app.route("/logout")
+def logout():
+    registrar_log("logout")
+    session.clear()
+    return redirect(url_for("login"))
+
 
 @app.route("/", methods=["GET"])
 @login_obrigatorio
