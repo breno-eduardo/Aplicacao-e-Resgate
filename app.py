@@ -1306,7 +1306,7 @@ def gerar_web():
     except Exception as e:
         flash(str(e), "erro")
         return redirect(url_for("index"))
- @app.route("/converter-xls", methods=["POST"])
+@app.route("/converter-xls", methods=["POST"])
 @login_obrigatorio
 def converter_xls_web():
     try:
