@@ -48,28 +48,66 @@
     <div class="card">
       <h2>Usuários cadastrados</h2>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Nome</th>
-            <th>E-mail</th>
-            <th>Admin</th>
-            <th>Ativo</th>
-            <th>Criado em</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for usuario in usuarios %}
+      <p class="muted">
+        Para alterar a senha, preencha o campo "Nova senha". Para manter a senha atual, deixe em branco.
+      </p>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
             <tr>
-              <td>{{ usuario.nome }}</td>
-              <td>{{ usuario.email }}</td>
-              <td>{{ "Sim" if usuario.admin else "Não" }}</td>
-              <td>{{ "Sim" if usuario.ativo else "Não" }}</td>
-              <td>{{ usuario.criado_em }}</td>
+              <th>Nome</th>
+              <th>E-mail</th>
+              <th>Nova senha</th>
+              <th>Admin</th>
+              <th>Ativo</th>
+              <th>Ações</th>
             </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+          </thead>
+
+          <tbody>
+            {% for usuario in usuarios %}
+              <tr>
+                <td>
+                  <form id="form-editar-{{ usuario.id }}" method="POST" action="/admin/usuarios/{{ usuario.id }}/editar">
+                    <input name="nome" type="text" value="{{ usuario.nome }}" required>
+                </td>
+
+                <td>
+                    <input name="email" type="email" value="{{ usuario.email }}" required>
+                </td>
+
+                <td>
+                    <input name="senha" type="password" placeholder="Nova senha">
+                </td>
+
+                <td class="center">
+                    <input name="admin" type="checkbox" {% if usuario.admin %}checked{% endif %}>
+                </td>
+
+                <td class="center">
+                    <input name="ativo" type="checkbox" {% if usuario.ativo %}checked{% endif %}>
+                </td>
+
+                <td class="acoes">
+                    <button type="submit">Salvar</button>
+                  </form>
+
+                  {% if usuario.id != session.get("usuario_id") %}
+                    <form method="POST"
+                          action="/admin/usuarios/{{ usuario.id }}/excluir"
+                          onsubmit="return confirm('Tem certeza que deseja excluir este usuário?');">
+                      <button type="submit" class="danger">Excluir</button>
+                    </form>
+                  {% else %}
+                    <span class="muted">Usuário atual</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
 
   </div>
