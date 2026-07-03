@@ -1320,6 +1320,153 @@ def admin_usuarios():
     return render_template("usuarios.html", usuarios=usuarios)
 
 @app.route("/logout")
+
+@app.route("/admin/usuarios", methods=["GET", "POST"])
+@login_obrigatorio
+@admin_obrigatorio
+def admin_usuarios():
+    if request.method == "POST":
+        nome = request.form.get("nome", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        senha = request.form.get("senha", "")
+        admin = True if request.form.get("admin") == "on" else False
+
+        if not nome or not email or not senha:
+            flash("Preencha nome, e-mail e senha.", "erro")
+            return redirect(url_for("admin_usuarios"))
+
+        try:
+            conn = conectar_banco()
+
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO usuarios (nome, email, senha_hash, admin, ativo)
+                        VALUES (%s, %s, %s, %s, TRUE)
+                    """, (
+                        nome,
+                        email,
+                        generate_password_hash(senha),
+                        admin
+                    ))
+
+            conn.close()
+            registrar_log(f"criou_usuario:{email}")
+            flash("Usuário criado com sucesso.", "sucesso")
+
+        except Exception as e:
+            flash(f"Erro ao criar usuário: {e}", "erro")
+
+        return redirect(url_for("admin_usuarios"))
+
+    usuarios = []
+
+    try:
+        conn = conectar_banco()
+
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, nome, email, ativo, admin, criado_em
+                    FROM usuarios
+                    ORDER BY criado_em DESC
+                """)
+                usuarios = cur.fetchall()
+
+        conn.close()
+
+    except Exception as e:
+        flash(f"Erro ao listar usuários: {e}", "erro")
+
+    return render_template("usuarios.html", usuarios=usuarios)
+
+
+@app.route("/admin/usuarios/<int:usuario_id>/editar", methods=["POST"])
+@login_obrigatorio
+@admin_obrigatorio
+def editar_usuario(usuario_id):
+    nome = request.form.get("nome", "").strip()
+    email = request.form.get("email", "").strip().lower()
+    senha = request.form.get("senha", "").strip()
+    admin = True if request.form.get("admin") == "on" else False
+    ativo = True if request.form.get("ativo") == "on" else False
+
+    if not nome or not email:
+        flash("Nome e e-mail são obrigatórios.", "erro")
+        return redirect(url_for("admin_usuarios"))
+
+    try:
+        conn = conectar_banco()
+
+        with conn:
+            with conn.cursor() as cur:
+                if senha:
+                    cur.execute("""
+                        UPDATE usuarios
+                        SET nome = %s,
+                            email = %s,
+                            senha_hash = %s,
+                            admin = %s,
+                            ativo = %s
+                        WHERE id = %s
+                    """, (
+                        nome,
+                        email,
+                        generate_password_hash(senha),
+                        admin,
+                        ativo,
+                        usuario_id
+                    ))
+                else:
+                    cur.execute("""
+                        UPDATE usuarios
+                        SET nome = %s,
+                            email = %s,
+                            admin = %s,
+                            ativo = %s
+                        WHERE id = %s
+                    """, (
+                        nome,
+                        email,
+                        admin,
+                        ativo,
+                        usuario_id
+                    ))
+
+        conn.close()
+        registrar_log(f"editou_usuario:{email}")
+        flash("Usuário atualizado com sucesso.", "sucesso")
+
+    except Exception as e:
+        flash(f"Erro ao editar usuário: {e}", "erro")
+
+    return redirect(url_for("admin_usuarios"))
+
+
+@app.route("/admin/usuarios/<int:usuario_id>/excluir", methods=["POST"])
+@login_obrigatorio
+@admin_obrigatorio
+def excluir_usuario(usuario_id):
+    if usuario_id == session.get("usuario_id"):
+        flash("Você não pode excluir o próprio usuário logado.", "erro")
+        return redirect(url_for("admin_usuarios"))
+
+    try:
+        conn = conectar_banco()
+
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM usuarios WHERE id = %s", (usuario_id,))
+
+        conn.close()
+        registrar_log(f"excluiu_usuario_id:{usuario_id}")
+        flash("Usuário excluído com sucesso.", "sucesso")
+
+    except Exception as e:
+        flash(f"Erro ao excluir usuário: {e}", "erro")
+
+    return redirect(url_for("admin_usuarios"))
+
 def logout():
     registrar_log("logout")
     session.clear()
