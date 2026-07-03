@@ -1276,65 +1276,6 @@ def admin_usuarios():
             flash("Preencha nome, e-mail e senha.", "erro")
             return redirect(url_for("admin_usuarios"))
 
-        senha_hash = generate_password_hash(senha)
-
-        try:
-            conn = conectar_banco()
-
-            with conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        INSERT INTO usuarios (nome, email, senha_hash, admin, ativo)
-                        VALUES (%s, %s, %s, %s, TRUE)
-                    """, (nome, email, senha_hash, admin))
-
-            conn.close()
-
-            registrar_log(f"criou_usuario:{email}")
-            flash("Usuário criado com sucesso.", "sucesso")
-
-        except Exception as e:
-            flash(f"Erro ao criar usuário: {e}", "erro")
-
-        return redirect(url_for("admin_usuarios"))
-
-    usuarios = []
-
-    try:
-        conn = conectar_banco()
-
-        with conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT id, nome, email, ativo, admin, criado_em
-                    FROM usuarios
-                    ORDER BY criado_em DESC
-                """)
-                usuarios = cur.fetchall()
-
-        conn.close()
-
-    except Exception as e:
-        flash(f"Erro ao listar usuários: {e}", "erro")
-
-    return render_template("usuarios.html", usuarios=usuarios)
-
-@app.route("/logout")
-
-@app.route("/admin/usuarios", methods=["GET", "POST"])
-@login_obrigatorio
-@admin_obrigatorio
-def admin_usuarios():
-    if request.method == "POST":
-        nome = request.form.get("nome", "").strip()
-        email = request.form.get("email", "").strip().lower()
-        senha = request.form.get("senha", "")
-        admin = True if request.form.get("admin") == "on" else False
-
-        if not nome or not email or not senha:
-            flash("Preencha nome, e-mail e senha.", "erro")
-            return redirect(url_for("admin_usuarios"))
-
         try:
             conn = conectar_banco()
 
@@ -1467,6 +1408,8 @@ def excluir_usuario(usuario_id):
 
     return redirect(url_for("admin_usuarios"))
 
+@app.route("/logout")
+@login_obrigatorio
 def logout():
     registrar_log("logout")
     session.clear()
