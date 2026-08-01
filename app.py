@@ -1033,7 +1033,6 @@ def conectar_banco():
 
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
-
 def inicializar_banco():
     conn = conectar_banco()
 
@@ -1069,7 +1068,6 @@ def inicializar_banco():
 
                 print(f"ADMIN_EMAIL configurado: {bool(admin_email)}")
                 print(f"ADMIN_PASSWORD configurado: {bool(admin_senha)}")
-                print(f"E-mail do administrador: {admin_email}")
 
                 if not admin_email:
                     raise RuntimeError("ADMIN_EMAIL não configurado.")
@@ -1077,18 +1075,30 @@ def inicializar_banco():
                 if not admin_senha:
                     raise RuntimeError("ADMIN_PASSWORD não configurado.")
 
+                admin_email = admin_email.strip().lower()
+
                 cur.execute(
                     "SELECT id FROM usuarios WHERE LOWER(email) = LOWER(%s)",
                     (admin_email,)
                 )
+
                 usuario_existente = cur.fetchone()
 
                 if usuario_existente:
-                    print(f"Administrador já existe. ID: {usuario_existente['id']}")
+                    print(
+                        f"Administrador já existe. "
+                        f"ID: {usuario_existente['id']}"
+                    )
                 else:
                     cur.execute("""
-                        INSERT INTO usuarios (nome, email, senha_hash, admin, ativo)
-                        VALUES (%s, LOWER(%s), %s, TRUE, TRUE)
+                        INSERT INTO usuarios (
+                            nome,
+                            email,
+                            senha_hash,
+                            admin,
+                            ativo
+                        )
+                        VALUES (%s, %s, %s, TRUE, TRUE)
                         RETURNING id
                     """, (
                         admin_nome,
@@ -1096,13 +1106,15 @@ def inicializar_banco():
                         generate_password_hash(admin_senha)
                     ))
 
-    novo_admin = cur.fetchone()
-    print(f"Administrador criado com sucesso. ID: {novo_admin['id']}")
+                    novo_admin = cur.fetchone()
+
+                    print(
+                        f"Administrador criado com sucesso. "
+                        f"ID: {novo_admin['id']}"
+                    )
 
     finally:
         conn.close()
-
-
 def registrar_log(acao):
     usuario_id = session.get("usuario_id")
     ip = request.headers.get("X-Forwarded-For", request.remote_addr)
