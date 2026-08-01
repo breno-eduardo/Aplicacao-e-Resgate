@@ -1067,22 +1067,37 @@ def inicializar_banco():
                 admin_email = os.environ.get("ADMIN_EMAIL")
                 admin_senha = os.environ.get("ADMIN_PASSWORD")
 
-                if admin_email and admin_senha:
-                    cur.execute(
-                        "SELECT id FROM usuarios WHERE email = %s",
-                        (admin_email,)
-                    )
-                    usuario_existente = cur.fetchone()
+                print(f"ADMIN_EMAIL configurado: {bool(admin_email)}")
+                print(f"ADMIN_PASSWORD configurado: {bool(admin_senha)}")
+                print(f"E-mail do administrador: {admin_email}")
 
-                    if not usuario_existente:
-                        cur.execute("""
-                            INSERT INTO usuarios (nome, email, senha_hash, admin)
-                            VALUES (%s, %s, %s, TRUE)
-                        """, (
-                            admin_nome,
-                            admin_email,
-                            generate_password_hash(admin_senha)
-                        ))
+                if not admin_email:
+                    raise RuntimeError("ADMIN_EMAIL não configurado.")
+
+                if not admin_senha:
+                    raise RuntimeError("ADMIN_PASSWORD não configurado.")
+
+                cur.execute(
+                    "SELECT id FROM usuarios WHERE LOWER(email) = LOWER(%s)",
+                    (admin_email,)
+                )
+                usuario_existente = cur.fetchone()
+
+                if usuario_existente:
+                    print(f"Administrador já existe. ID: {usuario_existente['id']}")
+                else:
+                    cur.execute("""
+                        INSERT INTO usuarios (nome, email, senha_hash, admin, ativo)
+                        VALUES (%s, LOWER(%s), %s, TRUE, TRUE)
+                        RETURNING id
+                    """, (
+                        admin_nome,
+                        admin_email,
+                        generate_password_hash(admin_senha)
+                    ))
+
+    novo_admin = cur.fetchone()
+    print(f"Administrador criado com sucesso. ID: {novo_admin['id']}")
 
     finally:
         conn.close()
