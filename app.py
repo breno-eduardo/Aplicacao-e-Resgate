@@ -1154,7 +1154,20 @@ def admin_obrigatorio(func):
         return func(*args, **kwargs)
     return wrapper
 
-app.secret_key = os.environ.get("SECRET_KEY", "troque-esta-chave-em-producao")
+app.secret_key = os.environ.get("SECRET_KEY")
+
+if not app.secret_key:
+    raise RuntimeError(
+        "SECRET_KEY não foi configurada."
+    )
+
+app.config.update(
+    SESSION_COOKIE_NAME="session",
+    SESSION_COOKIE_PATH="/",
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+)
 
 ALLOWED_EXTENSIONS = {"csv"}
 
