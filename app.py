@@ -1023,6 +1023,22 @@ def gerar_xlsx(caminho_132, caminho_199, caminho_174, caminho_170, caminho_saida
 
 app = Flask(__name__)
 
+class PrefixMiddleware:
+    def __init__(self, app, prefix):
+        self.app = app
+        self.prefix = prefix.rstrip("/")
+
+    def __call__(self, environ, start_response):
+        environ["SCRIPT_NAME"] = self.prefix
+        return self.app(environ, start_response)
+
+
+if os.environ.get("K_SERVICE"):
+    app.wsgi_app = PrefixMiddleware(
+        app.wsgi_app,
+        "/ferramentas/resgates"
+    )
+
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 
