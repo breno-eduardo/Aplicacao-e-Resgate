@@ -58,7 +58,7 @@
         {% endwith %}
       </div>
 
-      <form action="/gerar" method="POST" enctype="multipart/form-data">
+      <form action="{{ url_for('gerar_web') }}" method="POST" enctype="multipart/form-data">
         
         <div class="group required">
           <div class="group-header">
@@ -131,8 +131,8 @@
 
         
         <div class="submit-area">
-          <button type="submit" formaction="/gerar" class="submit-btn">
-            Gerar XLSX
+          <button type="submit" class="submit-btn">
+              Gerar XLSX
           </button>
 
           <button type="button" class="secondary-btn" onclick="abrirSeletorXLSX()">
@@ -144,7 +144,7 @@
           Sistema local para geração do template GPR.
         </div>
       </form>
-      <form id="form-converter-xls" action="/converter-xls" method="POST" enctype="multipart/form-data" style="display: none;">
+      <form id="form-converter-xls" action="{{ url_for('converter_xls_web') }}" method="POST" enctype="multipart/form-data" style="display: none;">
         <input id="arquivo_xlsx" name="arquivo_xlsx" type="file" accept=".xlsx">
       </form>
     </div>
