@@ -14,7 +14,6 @@ from flask import Flask, request, render_template, send_file, redirect, url_for,
 from functools import wraps
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from werkzeug.security import generate_password_hash, check_password_hash
 
 import subprocess
 import shutil
@@ -1039,6 +1038,8 @@ def inicializar_banco():
     try:
         with conn:
             with conn.cursor() as cur:
+                # A tabela local de usuarios pode continuar existindo no banco,
+                # mas nao e mais usada para autenticacao.
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS usuarios (
                         id SERIAL PRIMARY KEY,
@@ -1062,61 +1063,25 @@ def inicializar_banco():
                     );
                 """)
 
-                admin_nome = os.environ.get("ADMIN_NOME", "Administrador")
-                admin_email = os.environ.get("ADMIN_EMAIL")
-                admin_senha = os.environ.get("ADMIN_PASSWORD")
+                # Mantem nos logs a identidade recebida da sessao do Portal GPR,
+                # sem depender da tabela local de usuarios.
+                cur.execute("""
+                    ALTER TABLE logs_acesso
+                    ADD COLUMN IF NOT EXISTS usuario_email TEXT;
+                """)
 
-                print(f"ADMIN_EMAIL configurado: {bool(admin_email)}")
-                print(f"ADMIN_PASSWORD configurado: {bool(admin_senha)}")
-
-                if not admin_email:
-                    raise RuntimeError("ADMIN_EMAIL não configurado.")
-
-                if not admin_senha:
-                    raise RuntimeError("ADMIN_PASSWORD não configurado.")
-
-                admin_email = admin_email.strip().lower()
-
-                cur.execute(
-                    "SELECT id FROM usuarios WHERE LOWER(email) = LOWER(%s)",
-                    (admin_email,)
-                )
-
-                usuario_existente = cur.fetchone()
-
-                if usuario_existente:
-                    print(
-                        f"Administrador já existe. "
-                        f"ID: {usuario_existente['id']}"
-                    )
-                else:
-                    cur.execute("""
-                        INSERT INTO usuarios (
-                            nome,
-                            email,
-                            senha_hash,
-                            admin,
-                            ativo
-                        )
-                        VALUES (%s, %s, %s, TRUE, TRUE)
-                        RETURNING id
-                    """, (
-                        admin_nome,
-                        admin_email,
-                        generate_password_hash(admin_senha)
-                    ))
-
-                    novo_admin = cur.fetchone()
-
-                    print(
-                        f"Administrador criado com sucesso. "
-                        f"ID: {novo_admin['id']}"
-                    )
+                cur.execute("""
+                    ALTER TABLE logs_acesso
+                    ADD COLUMN IF NOT EXISTS usuario_nome TEXT;
+                """)
 
     finally:
         conn.close()
+
+
 def registrar_log(acao):
-    usuario_id = session.get("usuario_id")
+    usuario_email = session.get("usuario_email")
+    usuario_nome = session.get("usuario_nome")
     ip = request.headers.get("X-Forwarded-For", request.remote_addr)
     user_agent = request.headers.get("User-Agent", "")
 
@@ -1125,9 +1090,22 @@ def registrar_log(acao):
         with conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    INSERT INTO logs_acesso (usuario_id, acao, ip, user_agent)
-                    VALUES (%s, %s, %s, %s)
-                """, (usuario_id, acao, ip, user_agent))
+                    INSERT INTO logs_acesso (
+                        usuario_id,
+                        usuario_email,
+                        usuario_nome,
+                        acao,
+                        ip,
+                        user_agent
+                    )
+                    VALUES (NULL, %s, %s, %s, %s, %s)
+                """, (
+                    usuario_email,
+                    usuario_nome,
+                    acao,
+                    ip,
+                    user_agent,
+                ))
         conn.close()
     except Exception:
         pass
@@ -1136,22 +1114,23 @@ def registrar_log(acao):
 def login_obrigatorio(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
+        # A sessao e criada pelo Portal GPR.
         if not session.get("usuario_id"):
-            return redirect(url_for("login"))
+            return redirect("/login")
+
+        perfil = session.get("usuario_perfil")
+        modulos = session.get("usuario_modulos", [])
+
+        # O card ja e ocultado no Portal, mas esta verificacao impede
+        # acesso direto pela URL do Aplicacoes e Resgates.
+        if (
+            perfil != "ADMIN"
+            and "APLICACAO_RESGATE" not in modulos
+        ):
+            return "Acesso negado ao modulo Aplicacoes e Resgates.", 403
+
         return func(*args, **kwargs)
-    return wrapper
 
-def admin_obrigatorio(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        if not session.get("usuario_id"):
-            return redirect(url_for("login"))
-
-        if not session.get("usuario_admin"):
-            flash("Acesso restrito ao administrador.", "erro")
-            return redirect(url_for("index"))
-
-        return func(*args, **kwargs)
     return wrapper
 
 app.secret_key = os.environ.get("SECRET_KEY")
@@ -1257,203 +1236,11 @@ def converter_xlsx_para_xls_web(caminho_xlsx, pasta_saida):
 
     return caminho_xls
 
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        email = request.form.get("email", "").strip().lower()
-        senha = request.form.get("senha", "")
-
-        conn = conectar_banco()
-
-        try:
-            with conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT id, nome, email, senha_hash, ativo, admin
-                        FROM usuarios
-                        WHERE email = %s
-                    """, (email,))
-
-                    usuario = cur.fetchone()
-
-            if not usuario:
-                flash("E-mail ou senha inválidos.", "erro")
-                return redirect(url_for("login"))
-
-            if not usuario["ativo"]:
-                flash("Usuário inativo.", "erro")
-                return redirect(url_for("login"))
-
-            if not check_password_hash(usuario["senha_hash"], senha):
-                flash("E-mail ou senha inválidos.", "erro")
-                return redirect(url_for("login"))
-
-            session["usuario_id"] = usuario["id"]
-            session["usuario_nome"] = usuario["nome"]
-            session["usuario_email"] = usuario["email"]
-            session["usuario_admin"] = usuario["admin"]
-
-            registrar_log("login")
-
-            return redirect(url_for("index"))
-
-        finally:
-            conn.close()
-
-    return render_template("login.html")
-
-@app.route("/admin/usuarios", methods=["GET", "POST"])
-@login_obrigatorio
-@admin_obrigatorio
-def admin_usuarios():
-    if request.method == "POST":
-        nome = request.form.get("nome", "").strip()
-        email = request.form.get("email", "").strip().lower()
-        senha = request.form.get("senha", "")
-        admin = True if request.form.get("admin") == "on" else False
-
-        if not nome or not email or not senha:
-            flash("Preencha nome, e-mail e senha.", "erro")
-            return redirect(url_for("admin_usuarios"))
-
-        try:
-            conn = conectar_banco()
-
-            with conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        INSERT INTO usuarios (nome, email, senha_hash, admin, ativo)
-                        VALUES (%s, %s, %s, %s, TRUE)
-                    """, (
-                        nome,
-                        email,
-                        generate_password_hash(senha),
-                        admin
-                    ))
-
-            conn.close()
-            registrar_log(f"criou_usuario:{email}")
-            flash("Usuário criado com sucesso.", "sucesso")
-
-        except Exception as e:
-            flash(f"Erro ao criar usuário: {e}", "erro")
-
-        return redirect(url_for("admin_usuarios"))
-
-    usuarios = []
-
-    try:
-        conn = conectar_banco()
-
-        with conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT id, nome, email, ativo, admin, criado_em
-                    FROM usuarios
-                    ORDER BY criado_em DESC
-                """)
-                usuarios = cur.fetchall()
-
-        conn.close()
-
-    except Exception as e:
-        flash(f"Erro ao listar usuários: {e}", "erro")
-
-    return render_template("usuarios.html", usuarios=usuarios)
-
-
-@app.route("/admin/usuarios/<int:usuario_id>/editar", methods=["POST"])
-@login_obrigatorio
-@admin_obrigatorio
-def editar_usuario(usuario_id):
-    nome = request.form.get("nome", "").strip()
-    email = request.form.get("email", "").strip().lower()
-    senha = request.form.get("senha", "").strip()
-    admin = True if request.form.get("admin") == "on" else False
-    ativo = True if request.form.get("ativo") == "on" else False
-
-    if not nome or not email:
-        flash("Nome e e-mail são obrigatórios.", "erro")
-        return redirect(url_for("admin_usuarios"))
-
-    try:
-        conn = conectar_banco()
-
-        with conn:
-            with conn.cursor() as cur:
-                if senha:
-                    cur.execute("""
-                        UPDATE usuarios
-                        SET nome = %s,
-                            email = %s,
-                            senha_hash = %s,
-                            admin = %s,
-                            ativo = %s
-                        WHERE id = %s
-                    """, (
-                        nome,
-                        email,
-                        generate_password_hash(senha),
-                        admin,
-                        ativo,
-                        usuario_id
-                    ))
-                else:
-                    cur.execute("""
-                        UPDATE usuarios
-                        SET nome = %s,
-                            email = %s,
-                            admin = %s,
-                            ativo = %s
-                        WHERE id = %s
-                    """, (
-                        nome,
-                        email,
-                        admin,
-                        ativo,
-                        usuario_id
-                    ))
-
-        conn.close()
-        registrar_log(f"editou_usuario:{email}")
-        flash("Usuário atualizado com sucesso.", "sucesso")
-
-    except Exception as e:
-        flash(f"Erro ao editar usuário: {e}", "erro")
-
-    return redirect(url_for("admin_usuarios"))
-
-
-@app.route("/admin/usuarios/<int:usuario_id>/excluir", methods=["POST"])
-@login_obrigatorio
-@admin_obrigatorio
-def excluir_usuario(usuario_id):
-    if usuario_id == session.get("usuario_id"):
-        flash("Você não pode excluir o próprio usuário logado.", "erro")
-        return redirect(url_for("admin_usuarios"))
-
-    try:
-        conn = conectar_banco()
-
-        with conn:
-            with conn.cursor() as cur:
-                cur.execute("DELETE FROM usuarios WHERE id = %s", (usuario_id,))
-
-        conn.close()
-        registrar_log(f"excluiu_usuario_id:{usuario_id}")
-        flash("Usuário excluído com sucesso.", "sucesso")
-
-    except Exception as e:
-        flash(f"Erro ao excluir usuário: {e}", "erro")
-
-    return redirect(url_for("admin_usuarios"))
-
-@app.route("/logout")
-@login_obrigatorio
-def logout():
-    registrar_log("logout")
-    session.clear()
-    return redirect(url_for("login"))
+# ============================================================
+# AUTENTICACAO
+# ============================================================
+# Nao existe login local neste servico.
+# O acesso usa exclusivamente a sessao criada pelo Portal GPR.
 
 
 @app.route("/", methods=["GET"])
