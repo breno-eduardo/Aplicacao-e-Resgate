@@ -830,12 +830,13 @@ def processar_data_futura(df199, df174, df170, ug_emitente_132):
         grupos_finais[chave]["valor"] += valor_linha_199
 
     linhas = []
+
     grupos_ordenados = sorted(
         grupos_finais.values(),
         key=lambda x: (chave_data(x["data"]), str(x["classificacao"]))
     )
 
-    primeira_linha = True
+    data_anterior = None
 
     for grupo in grupos_ordenados:
         valor = arredondar2(grupo["valor"])
@@ -846,9 +847,13 @@ def processar_data_futura(df199, df174, df170, ug_emitente_132):
         operacao = "1917" if valor < 0 else "1916"
         valor_item = abs(valor)
 
-        if primeira_linha:
+        data_atual = formatar_data(grupo["data"])
+
+        # Primeira linha de cada nova data recebe
+        # Data, UG, observação, processo e estorno.
+        if data_atual != data_anterior:
             linhas.append([
-                formatar_data(grupo["data"]),
+                data_atual,
                 grupo["ug_emitente"],
                 "",
                 OBSERVACAO_PADRAO,
@@ -860,7 +865,9 @@ def processar_data_futura(df199, df174, df170, ug_emitente_132):
                 grupo["classificacao"],
                 valor_item,
             ])
-            primeira_linha = False
+
+            data_anterior = data_atual
+
         else:
             linhas.append([
                 "",
@@ -995,12 +1002,45 @@ def gerar_xlsx(caminho_132, caminho_199, caminho_174, caminho_170, caminho_saida
     escrever_aba(wb, nome_aba_atual, linhas_atual)
 
     if tem_data_futura and linhas_futura:
-        nome_aba_futura = nome_aba_por_data(linhas_futura[0][0])
 
-        if nome_aba_futura == nome_aba_atual:
-            nome_aba_futura = f"{nome_aba_futura} Futuro"
+        linhas_por_data = {}
+        data_corrente = None
 
-        escrever_aba(wb, nome_aba_futura, linhas_futura)
+        # Separa as linhas futuras pela data da PD
+        for linha in linhas_futura:
+
+            if linha[0]:
+                data_corrente = linha[0]
+
+            if not data_corrente:
+                continue
+
+            if data_corrente not in linhas_por_data:
+                linhas_por_data[data_corrente] = []
+
+            linhas_por_data[data_corrente].append(linha)
+
+        nomes_abas_futuras = []
+
+        # Cria uma aba para cada data
+        for data_futura in sorted(
+            linhas_por_data.keys(),
+            key=chave_data
+        ):
+            nome_aba = nome_aba_por_data(data_futura)
+
+            if nome_aba == nome_aba_atual:
+                nome_aba = f"{nome_aba} Futuro"
+
+            escrever_aba(
+                wb,
+                nome_aba,
+                linhas_por_data[data_futura]
+            )
+
+            nomes_abas_futuras.append(nome_aba)
+
+        nome_aba_futura = ", ".join(nomes_abas_futuras)
 
     caminho_saida = Path(caminho_saida)
     caminho_saida.parent.mkdir(parents=True, exist_ok=True)
